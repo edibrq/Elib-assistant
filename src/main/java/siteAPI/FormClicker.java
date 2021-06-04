@@ -32,6 +32,7 @@ public class FormClicker {
 
             WebElement searchButton = driver.findElement(new By.ByXPath("//*[@id=\"ext-gen20\"]"));
             searchButton.click();
+
         }
     }
 
