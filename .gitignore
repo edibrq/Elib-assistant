@@ -4,4 +4,4 @@ pom.xml
 chromedriver_win32.zip
 null
 .class
-target
+target/classes
