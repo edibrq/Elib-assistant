@@ -11,6 +11,6 @@ public class TestMain {
          String searchValue1 = "123";
 
          FormClicker formClicker = new FormClicker(login, password, enterURL, searchValue);
-         formClicker.OpenBrowser();
+         formClicker.start();
     }
 }
