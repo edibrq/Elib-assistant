@@ -8,17 +8,15 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.support.ui.Select;
 import siteAPI.entities.TableElement;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 
 public class FormClicker {
 
-    private final String nextPageRefPrev = "http://elibrary.misis.ru/search2.php?action=oldSearchResults&page=1";
+    private final String nextPageRefPrev = "http://elibrary.misis.ru/search2.php?action=oldSearchResults&page=";
     private final String nextPageRefNext = "&sort_on=ktcore.columns.title&sort_order=asc\"";
 
 
@@ -61,8 +59,12 @@ public class FormClicker {
             WebElement searchButton = driver.findElement(new By.ByXPath("//*[@id=\"ext-gen20\"]"));
             searchButton.click();
 
-            searchResult(driver);
+//            WebElement selectElem = driver.findElement(By.xpath("//*[@id=\"content\"]/form/table/tfoot/tr/td[2]/select"));
+//            Select select = new Select(selectElem);
+//            select.selectByValue("50");
 
+            searchResult(driver);
+            download(driver);
         }
     }
 
@@ -75,7 +77,15 @@ public class FormClicker {
         return null;
     }
 
-    public void addElementsToList(Elements a, List<TableElement> tableElements){
+    public void addElementsToList(List<TableElement> tableElements, String pageSource){
+
+        Document page = Jsoup.parse(pageSource);
+
+        Element wrapper = page.select("div#wrapper").first();
+
+        Element table = wrapper.select("table").get(6);
+        Elements a = table.select("a");
+
         for (Element href: a){
             tableElements.add(new TableElement(href.text(),href.attr("href")));
         }
@@ -107,45 +117,46 @@ public class FormClicker {
 
     public void searchResult(ChromeDriver driver) {
         WebElement numberOfElements = driver.findElement(new By.ByClassName("descriptiveText"));
+
         String text = numberOfElements.getText();
         System.out.println(text);
         int results = parseString(text);
         System.out.println(results);
 
-        if (results < 25) {
+        if (results < 50) {
             String pageSource = driver.getPageSource();
-            Document page = Jsoup.parse(pageSource);
 
-            Element wrapper = page.select("div#wrapper").first();
-
-            Element table = wrapper.select("table").get(6);
-            Elements a = table.select("a");
-
-            addElementsToList(a, tableElements);
-            searchElement(searchValue, tableElements);
+            addElementsToList(tableElements, pageSource);
             editHrefOfElements(tableElements);
 
-            for (TableElement tableElement : tableElements) {
-                System.out.println(tableElement.toString());
+            System.out.println("Найдено " + tableElements.size() + " записей");
+
+            try{
+                goToBookPage(driver, searchElement(searchValue, tableElements));
+            } catch (NoSuchElementException e){
+                System.out.println("No such element!");
             }
-
-            goToNextPage(driver);
-
+            
         } else {
-            int numberOfPages = results / 25;
-            for (int i = 0; i < numberOfPages; i++) {
+            int numberOfPages = results / 50 + 1;
+            System.out.println("Number of pages:"+numberOfPages);
+            for (int i = 1; i <= numberOfPages; i++) {
                 int pageNumber = i;
                 StringBuilder nextPageRef = new StringBuilder();
                 nextPageRef.append(nextPageRefPrev).append(i).append(nextPageRefNext);
 
+                String pageSource = driver.getPageSource();
+                addElementsToList(tableElements, pageSource);
+                editHrefOfElements(tableElements);
+
+                goToNextPage(driver, i);
             }
         }
     }
 
-    public void goToNextPage(ChromeDriver driver){
+    public void goToBookPage(ChromeDriver driver, TableElement result){
         //Logic of opening new Window
-        TableElement result = searchElement(searchValue, tableElements);
-        if (!result.getTitle().equals(searchValue)) {
+        if (!result.getTitle().contains(searchValue)) {
             System.out.println("Not found.");
         } else {
             driver.executeScript("window.open('" + result.getHref() + "', 'new_window')");
@@ -158,6 +169,50 @@ public class FormClicker {
 
             WebElement numberOfPagesStr = windowNew.findElement(By.xpath("//*[@id=\"SecView-page-count\"]"));
             System.out.println("Number of pages:" + parseString(numberOfPagesStr.getText()));
+
+
+            String pageSource = driver.getPageSource();
+            Document document = Jsoup.parse(pageSource);
+            System.out.println(document);
         }
+    }
+
+    public void goToNextPage(ChromeDriver driver, int pageNumber){
+//        String oldTab = driver.getWindowHandle();
+
+        StringBuilder linkText = new StringBuilder("//*[@id=\"content\"]/form/table/tfoot/tr/td[1]/span[2]/span/a[");
+        linkText.append(pageNumber);
+        linkText.append("]");
+        driver.findElement(By.xpath(linkText.toString())).click();
+
+//        ArrayList<String> newTab = new ArrayList<>(driver.getWindowHandles());
+//        System.out.println(newTab);
+
+        addElementsToList(tableElements, driver.getPageSource());
+        editHrefOfElements(tableElements);
+
+
+        try{
+            goToBookPage(driver, searchElement(searchValue, tableElements));
+        } catch (NoSuchElementException e){
+            System.out.println("No such element!");
+        }
+
+//        newTab.remove(oldTab);
+        // change focus to new tab
+//        driver.switchTo().window(newTab.get(0));
+
+        addElementsToList(tableElements, driver.getPageSource());
+        editHrefOfElements(tableElements);
+        System.out.println("Найдено " + tableElements.size() + " записей");
+        // Do what you want here, you are in the new tab
+
+//        driver.close();
+        // change focus back to old tab
+//        driver.switchTo().window(oldTab);
+    }
+
+    private void download(ChromeDriver driver) {
+
     }
 }
